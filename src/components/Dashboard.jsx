@@ -3,6 +3,7 @@ import BudgetOptimizer from "./BudgetOptimizer";
 import { useEffect, useState } from "react";
 import { getTrends, getGoals, uploadCSV } from "@/lib/api";
 import axios from "axios";
+import { API_BASE } from "@/lib/config";   // ✅ use config.js
 import {
   PieChart,
   Pie,
@@ -29,17 +30,14 @@ export default function Dashboard() {
   const [forecastMonths, setForecastMonths] = useState(3);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Chat history
   const [chatHistory, setChatHistory] = useState([]);
   const [chatLoading, setChatLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
 
-  // ✅ Filters for chat
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [keyword, setKeyword] = useState("");
 
-  // Quick Expense Form
   const [form, setForm] = useState({
     amount: "",
     category: "",
@@ -47,17 +45,14 @@ export default function Dashboard() {
     merchant: "",
   });
 
-  // Goal Form
   const [goalForm, setGoalForm] = useState({
     category: "",
     target_amount: "",
     period: "monthly",
   });
 
-  // CSV Import
   const [csvStatus, setCsvStatus] = useState("");
 
-  // Get logged in userId
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storedId = localStorage.getItem("userId");
@@ -65,14 +60,13 @@ export default function Dashboard() {
     }
   }, []);
 
-  // Fetch data
+  // ✅ Fetch dashboard data
   const fetchData = async (uid, months = forecastMonths) => {
     if (!uid) return;
     setLoading(true);
     try {
       const { data } = await getTrends(uid);
 
-      // Category & daily totals
       const catTotals = {};
       const dailyTotals = {};
 
@@ -85,7 +79,6 @@ export default function Dashboard() {
         catTotals[cat] = (catTotals[cat] || 0) + total;
       });
 
-      // Category pie
       setByCategory(
         Object.entries(catTotals).map(([category, total]) => ({
           name: category,
@@ -93,7 +86,6 @@ export default function Dashboard() {
         }))
       );
 
-      // Daily trend
       setMonthlyTrend(
         Object.entries(dailyTotals).map(([date, total]) => ({
           date,
@@ -101,7 +93,6 @@ export default function Dashboard() {
         }))
       );
 
-      // Weekly aggregation
       const weekly = {};
       Object.entries(dailyTotals).forEach(([date, total]) => {
         const d = new Date(date);
@@ -115,9 +106,7 @@ export default function Dashboard() {
         }))
       );
 
-      // Budget vs actual
       const goalsResp = await getGoals(uid);
-
       const catLowerMap = {};
       Object.entries(catTotals).forEach(([k, v]) => {
         catLowerMap[k.toLowerCase()] = v;
@@ -137,9 +126,9 @@ export default function Dashboard() {
         })
       );
 
-      // ✅ Fetch forecast with months param
+      // ✅ Forecast request with API_BASE
       const forecastResp = await axios.get(
-        `http://127.0.0.1:8000/forecast/${uid}?months=${months}`
+        `${API_BASE}/forecast/${uid}?months=${months}`
       );
       setForecast(forecastResp.data || { history: [], forecast: [] });
     } catch (e) {
@@ -149,12 +138,12 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch chat history
+  // ✅ Fetch chat history
   const fetchChatHistory = async (uid) => {
     if (!uid) return;
     setChatLoading(true);
     try {
-      const res = await axios.get(`http://127.0.0.1:8000/chat/history/${uid}`);
+      const res = await axios.get(`${API_BASE}/chat/history/${uid}`);
       setChatHistory(res.data || []);
     } catch (err) {
       console.error("Failed to load chat history:", err);
@@ -174,7 +163,6 @@ export default function Dashboard() {
       };
       window.addEventListener("expenses:changed", handler);
 
-      // ✅ Auto-refresh chat history every 30s
       const interval = setInterval(() => fetchChatHistory(userId), 30000);
 
       return () => {
@@ -184,20 +172,11 @@ export default function Dashboard() {
     }
   }, [userId, forecastMonths]);
 
-  const COLORS = [
-    "#2563eb",
-    "#22c55e",
-    "#f59e0b",
-    "#ef4444",
-    "#8b5cf6",
-    "#06b6d4",
-  ];
-
-  // Submit quick expense
+  // ✅ Quick expense
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post("http://127.0.0.1:8000/expense/quick", {
+      await axios.post(`${API_BASE}/expense/quick`, {
         user_id: userId,
         amount: parseFloat(form.amount),
         category: form.category,
@@ -212,17 +191,16 @@ export default function Dashboard() {
     }
   };
 
-  // Submit goal
+  // ✅ Save goal
   const handleGoalSubmit = async (e) => {
     e.preventDefault();
-
     if (!goalForm.category || !goalForm.target_amount) {
       alert("⚠️ Please fill category and target amount.");
       return;
     }
 
     try {
-      await axios.post("http://127.0.0.1:8000/goals", {
+      await axios.post(`${API_BASE}/goals`, {
         user_id: userId,
         category: goalForm.category,
         target_amount: Number(goalForm.target_amount),
@@ -239,7 +217,7 @@ export default function Dashboard() {
     }
   };
 
-  // Handle CSV Upload
+  // ✅ CSV Upload
   const handleCSVUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -278,13 +256,22 @@ export default function Dashboard() {
     );
   }
 
+  const COLORS = [
+    "#2563eb",
+    "#22c55e",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4",
+  ];
+
   return (
     <div className="bg-white p-4 md:p-6 shadow-lg rounded-2xl border border-gray-100 space-y-6">
       <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
         📊 Dashboard
       </h2>
 
-      {/* 📂 CSV Import */}
+      {/* CSV Import */}
       <div className="bg-gray-50 rounded-xl p-4 shadow-inner">
         <h3 className="text-md font-semibold mb-3 text-gray-700">📂 Import CSV</h3>
         <input
@@ -296,7 +283,7 @@ export default function Dashboard() {
         {csvStatus && <p className="mt-2 text-sm">{csvStatus}</p>}
       </div>
 
-      {/* Expense Forecast with Dropdown */}
+      {/* Expense Forecast */}
       <div className="h-[280px] sm:h-[320px] lg:h-[350px] bg-gray-50 rounded-xl p-3 sm:p-4 shadow-inner">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-md font-semibold text-gray-700">📈 Expense Forecast</h3>
@@ -339,9 +326,7 @@ export default function Dashboard() {
 
       {/* Spending by Category */}
       <div className="h-[250px] sm:h-[300px] lg:h-[320px] bg-gray-50 rounded-xl p-3 sm:p-4 shadow-inner">
-        <h3 className="text-md font-semibold mb-2 text-gray-700">
-          Spending by Category
-        </h3>
+        <h3 className="text-md font-semibold mb-2 text-gray-700">Spending by Category</h3>
         <ResponsiveContainer width="100%" height="85%">
           <PieChart>
             <Pie
@@ -367,9 +352,7 @@ export default function Dashboard() {
 
       {/* Daily Spending Trend */}
       <div className="h-[250px] sm:h-[300px] lg:h-[320px] bg-gray-50 rounded-xl p-3 sm:p-4 shadow-inner">
-        <h3 className="text-md font-semibold mb-2 text-gray-700">
-          Daily Spending Trend
-        </h3>
+        <h3 className="text-md font-semibold mb-2 text-gray-700">Daily Spending Trend</h3>
         <ResponsiveContainer width="100%" height="85%">
           <LineChart data={monthlyTrend}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -390,9 +373,7 @@ export default function Dashboard() {
 
       {/* Weekly Expenses */}
       <div className="h-[250px] sm:h-[300px] lg:h-[320px] bg-gray-50 rounded-xl p-3 sm:p-4 shadow-inner">
-        <h3 className="text-md font-semibold mb-2 text-gray-700">
-          Weekly Expenses
-        </h3>
+        <h3 className="text-md font-semibold mb-2 text-gray-700">Weekly Expenses</h3>
         <ResponsiveContainer width="100%" height="85%">
           <BarChart data={weeklyExpenses}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -407,9 +388,7 @@ export default function Dashboard() {
 
       {/* Budget vs Actual */}
       <div className="h-[250px] sm:h-[300px] lg:h-[320px] bg-gray-50 rounded-xl p-3 sm:p-4 shadow-inner">
-        <h3 className="text-md font-semibold mb-2 text-gray-700">
-          Budget vs Actual
-        </h3>
+        <h3 className="text-md font-semibold mb-2 text-gray-700">Budget vs Actual</h3>
         <ResponsiveContainer width="100%" height="85%">
           <BarChart data={budgetData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -425,13 +404,8 @@ export default function Dashboard() {
 
       {/* Quick Expense Entry */}
       <div className="bg-gray-50 rounded-xl p-4 shadow-inner">
-        <h3 className="text-md font-semibold mb-3 text-gray-700">
-          ➕ Quick Expense Entry
-        </h3>
-        <form
-          onSubmit={handleFormSubmit}
-          className="grid grid-cols-1 sm:grid-cols-3 gap-3"
-        >
+        <h3 className="text-md font-semibold mb-3 text-gray-700">➕ Quick Expense Entry</h3>
+        <form onSubmit={handleFormSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <input
             type="number"
             placeholder="Amount"
@@ -458,9 +432,7 @@ export default function Dashboard() {
           <textarea
             placeholder="Description (optional)"
             value={form.description}
-            onChange={(e) =>
-              setForm({ ...form, description: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
             className="border rounded-lg px-3 py-2 col-span-1 sm:col-span-3"
           />
           <button
@@ -474,20 +446,13 @@ export default function Dashboard() {
 
       {/* Set Budget Goal */}
       <div className="bg-gray-50 rounded-xl p-4 shadow-inner">
-        <h3 className="text-md font-semibold mb-3 text-gray-700">
-          🎯 Set Budget Goal
-        </h3>
-        <form
-          onSubmit={handleGoalSubmit}
-          className="grid grid-cols-1 sm:grid-cols-3 gap-3"
-        >
+        <h3 className="text-md font-semibold mb-3 text-gray-700">🎯 Set Budget Goal</h3>
+        <form onSubmit={handleGoalSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <input
             type="text"
             placeholder="Category"
             value={goalForm.category}
-            onChange={(e) =>
-              setGoalForm({ ...goalForm, category: e.target.value })
-            }
+            onChange={(e) => setGoalForm({ ...goalForm, category: e.target.value })}
             className="border rounded-lg px-3 py-2"
             required
           />
@@ -495,17 +460,13 @@ export default function Dashboard() {
             type="number"
             placeholder="Target Amount"
             value={goalForm.target_amount}
-            onChange={(e) =>
-              setGoalForm({ ...goalForm, target_amount: e.target.value })
-            }
+            onChange={(e) => setGoalForm({ ...goalForm, target_amount: e.target.value })}
             className="border rounded-lg px-3 py-2"
             required
           />
           <select
             value={goalForm.period}
-            onChange={(e) =>
-              setGoalForm({ ...goalForm, period: e.target.value })
-            }
+            onChange={(e) => setGoalForm({ ...goalForm, period: e.target.value })}
             className="border rounded-lg px-3 py-2"
           >
             <option value="monthly">Monthly</option>
@@ -520,7 +481,7 @@ export default function Dashboard() {
         </form>
       </div>
 
-      {/* Chat History with Filters */}
+      {/* Chat History */}
       <div className="bg-gray-50 rounded-xl p-4 shadow-inner">
         <h3
           className="text-md font-semibold mb-3 text-gray-700 flex items-center justify-between cursor-pointer"
@@ -533,7 +494,6 @@ export default function Dashboard() {
         </h3>
         {showHistory && (
           <>
-            {/* ✅ Filters */}
             <div className="flex flex-wrap gap-2 mb-3">
               <input
                 type="date"
