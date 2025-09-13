@@ -1,26 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
-import { API_BASE } from "./config";
+import { API_BASE } from "@/lib/config";
 
 export default function BudgetOptimizer({ userId }) {
-  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [data, setData] = useState(null);
   const [applied, setApplied] = useState(false);
+  const [error, setError] = useState("");
 
-  // Fetch optimizer results
   const runOptimizer = async () => {
     if (!userId) return;
     setLoading(true);
@@ -31,81 +20,54 @@ export default function BudgetOptimizer({ userId }) {
       setData(res.data);
     } catch (err) {
       console.error("Optimizer failed:", err);
-      setError("❌ Failed to fetch optimizer results.");
+      setError("❌ Failed to optimize budget");
     } finally {
       setLoading(false);
     }
   };
 
-  // Apply suggested budgets (new backend endpoint)
   const applyBudgets = async () => {
     if (!data?.suggested_budgets) return;
     try {
-      const res = await axios.post(
-        `${API_BASE}/budget/optimize/apply/${userId}`
-      );
+      const res = await axios.post(`${API_BASE}/budget/optimize/apply/${userId}`);
       setApplied(true);
       alert(res.data.message || "✅ Suggested budgets applied!");
     } catch (err) {
-      console.error("Failed to apply budgets:", err);
-      alert("❌ Failed to apply suggested budgets.");
+      console.error("Apply failed:", err);
+      setError("❌ Failed to apply budgets");
     }
   };
 
   return (
-    <div className="bg-gray-50 rounded-xl p-4 shadow-inner space-y-4">
-      <h3 className="text-md font-semibold mb-2 text-gray-700">
+    <div className="bg-gray-50 rounded-xl p-4 shadow-inner">
+      <h3 className="text-md font-semibold mb-3 text-gray-700">
         🤖 Smart Budget Optimizer
       </h3>
-
       <button
         onClick={runOptimizer}
-        className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
         disabled={loading}
+        className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50"
       >
-        {loading ? "🔄 Optimizing..." : "Run Optimizer"}
+        {loading ? "Optimizing..." : "Run Optimizer"}
       </button>
-
-      {error && <p className="text-red-600 text-sm">{error}</p>}
-
+      {error && <p className="text-red-600 mt-2">{error}</p>}
       {data && (
-        <div className="space-y-4">
-          <p className="text-sm text-gray-700">{data.summary}</p>
-
-          {/* Chart */}
-          <div className="h-[250px] bg-white rounded-lg p-2 border">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={Object.keys(data.original_budgets || {}).map((cat) => ({
-                  category: cat,
-                  original: data.original_budgets[cat],
-                  suggested: data.suggested_budgets[cat],
-                }))}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="category" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="original" fill="#2563eb" name="Original" />
-                <Bar dataKey="suggested" fill="#f59e0b" name="Suggested" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Apply Button */}
+        <div className="mt-3 bg-white p-3 rounded-lg shadow">
+          <h4 className="font-semibold">Suggested Budgets:</h4>
+          <ul className="list-disc pl-6">
+            {Object.entries(data.suggested_budgets).map(([cat, val]) => (
+              <li key={cat}>
+                {cat}: ${val.toFixed(2)}
+              </li>
+            ))}
+          </ul>
           {!applied && (
             <button
               onClick={applyBudgets}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
+              className="mt-3 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
             >
-              ✅ Apply Suggested Budgets
+              Apply Budgets
             </button>
-          )}
-          {applied && (
-            <p className="text-green-600 text-sm">
-              ✅ Budgets applied successfully!
-            </p>
           )}
         </div>
       )}
