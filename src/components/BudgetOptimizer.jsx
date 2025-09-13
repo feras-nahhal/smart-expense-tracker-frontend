@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import axios from "axios";
 import {
   BarChart,
@@ -12,6 +12,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { API_BASE } from "./config";
 
 export default function BudgetOptimizer({ userId }) {
   const [data, setData] = useState(null);
@@ -26,9 +27,7 @@ export default function BudgetOptimizer({ userId }) {
     setError("");
     setApplied(false);
     try {
-      const res = await axios.get(
-        `http://127.0.0.1:8000/budget/optimize/${userId}`
-      );
+      const res = await axios.get(`${API_BASE}/budget/optimize/${userId}`);
       setData(res.data);
     } catch (err) {
       console.error("Optimizer failed:", err);
@@ -43,7 +42,7 @@ export default function BudgetOptimizer({ userId }) {
     if (!data?.suggested_budgets) return;
     try {
       const res = await axios.post(
-        `http://127.0.0.1:8000/budget/optimize/apply/${userId}`
+        `${API_BASE}/budget/optimize/apply/${userId}`
       );
       setApplied(true);
       alert(res.data.message || "✅ Suggested budgets applied!");
