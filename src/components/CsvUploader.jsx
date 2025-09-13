@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { API_BASE } from "@/lib/config";
 
 export default function CsvUploader({ userId, onUploaded }) {
   const [file, setFile] = useState(null);
@@ -23,7 +24,7 @@ export default function CsvUploader({ userId, onUploaded }) {
     setMessage("");
 
     try {
-      const res = await fetch(`http://127.0.0.1:8000/upload/csv?user_id=${userId}`, {
+      const res = await fetch(`${API_BASE}/upload/csv?user_id=${userId}`, {
         method: "POST",
         body: formData,
       });
