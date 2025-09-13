@@ -1,88 +1,137 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { WS_BASE } from "@/lib/config";
+import { Send } from "lucide-react";
 
-export default function ChatPanel({ userId }) {
-  const [messages, setMessages] = useState([]);
+export default function ChatPanel() {
+  const [messages, setMessages] = useState([
+    { sender: "bot", text: "👋 Hi! Try: I spent $7 on coffee" },
+  ]);
   const [input, setInput] = useState("");
-  const [connected, setConnected] = useState(false);
-  const wsRef = useRef(null);
+  const socketRef = useRef(null);
+  const messagesEndRef = useRef(null);
+
+  // ✅ Get logged-in userId
+  const userId =
+    typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   useEffect(() => {
     if (!userId) return;
 
-    const wsUrl = `${WS_BASE}/ws/chat/${userId}`;
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket(`${WS_BASE}/ws/chat/${userId}`);
+    socketRef.current = ws;
 
-    wsRef.current = ws;
+    ws.onopen = () =>
+      setMessages((m) => [...m, { sender: "sys", text: "✅ Connected" }]);
 
-    ws.onopen = () => {
-      console.log("✅ WebSocket connected:", wsUrl);
-      setConnected(true);
-    };
+    ws.onmessage = (event) => {
+      const text = event.data;
+      setMessages((m) => [...m, { sender: "bot", text }]);
 
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        setMessages((prev) => [...prev, msg]);
-      } catch (err) {
-        console.error("❌ Error parsing message:", err);
+      if (text.startsWith("✅ Added") || text.startsWith("📊")) {
+        window.dispatchEvent(new CustomEvent("expenses:changed"));
+      }
+
+      if (text.startsWith("🚨") || text.startsWith("🎯")) {
+        window.dispatchEvent(new CustomEvent("alert:new", { detail: text }));
       }
     };
 
-    ws.onclose = () => {
-      console.log("❌ WebSocket closed");
-      setConnected(false);
-    };
+    ws.onclose = () =>
+      setMessages((m) => [...m, { sender: "sys", text: "⚠️ Disconnected" }]);
+
+    ws.onerror = () =>
+      setMessages((m) => [
+        ...m,
+        { sender: "sys", text: "❌ WebSocket error (check backend URL/port)" },
+      ]);
 
     return () => ws.close();
   }, [userId]);
 
   const sendMessage = () => {
-    if (wsRef.current && input.trim()) {
-      wsRef.current.send(JSON.stringify({ message: input }));
-      setMessages((prev) => [...prev, { sender: "You", message: input }]);
-      setInput("");
-    }
+    const text = input.trim();
+    if (!text || !socketRef.current || socketRef.current.readyState !== 1)
+      return;
+    setMessages((m) => [...m, { sender: "you", text }]);
+    socketRef.current.send(text);
+    setInput("");
+  };
+
+  const onKey = (e) => e.key === "Enter" && sendMessage();
+
+  const handleLogout = () => {
+    localStorage.removeItem("userId");
+    localStorage.removeItem("email");
+    localStorage.removeItem("monthly_budget");
+    window.location.reload();
   };
 
   return (
-    <div className="p-4 bg-white rounded-2xl shadow flex flex-col h-80">
-      <h2 className="text-lg font-semibold mb-2">💬 Chat with AI</h2>
-      <div className="flex-1 overflow-y-auto space-y-2 border p-2 rounded-lg">
+    <div className="flex flex-col w-full h-full max-w-md mx-auto rounded-2xl shadow-xl bg-white overflow-hidden">
+      {/* Header */}
+      <div className="p-4 bg-blue-600 text-white flex items-center justify-between">
+        <div>
+          <h1 className="font-bold text-lg">💬 Smart Expense Chat</h1>
+          <p className="text-sm text-blue-100">
+            Track your spending in real time
+          </p>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="ml-4 px-3 py-1 bg-red-500 hover:bg-red-600 rounded-full text-sm font-medium shadow"
+        >
+          🚪 Logout
+        </button>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-gray-50">
         {messages.map((m, i) => (
           <div
             key={i}
-            className={`p-2 rounded ${
-              m.sender === "You"
-                ? "bg-blue-100 text-right"
-                : "bg-gray-100 text-left"
+            className={`flex ${
+              m.sender === "you" ? "justify-end" : "justify-start"
             }`}
           >
-            <span className="font-semibold">{m.sender}: </span>
-            {m.message}
+            <div
+              className={`px-4 py-2 rounded-2xl max-w-[75%] text-sm shadow ${
+                m.sender === "you"
+                  ? "bg-blue-600 text-white rounded-br-md"
+                  : m.sender === "bot"
+                  ? "bg-white text-gray-900 border rounded-bl-md"
+                  : "bg-yellow-100 text-yellow-800 border border-yellow-300"
+              }`}
+            >
+              {m.text}
+            </div>
           </div>
         ))}
+        <div ref={messagesEndRef} />
       </div>
-      <div className="flex mt-2">
+
+      {/* Input */}
+      <div className="p-3 bg-white border-t flex items-center gap-2">
         <input
-          className="flex-1 border rounded-l-lg px-2 py-1"
+          className="flex-1 px-4 py-2 text-sm border rounded-full 
+                     focus:outline-none focus:ring-2 focus:ring-blue-400 
+                     text-black placeholder-gray-400"
+          placeholder="Type a message..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={connected ? "Type your message..." : "Connecting..."}
-          disabled={!connected}
+          onKeyDown={onKey}
         />
         <button
           onClick={sendMessage}
-          disabled={!connected}
-          className="bg-blue-600 text-white px-4 rounded-r-lg hover:bg-blue-700 disabled:opacity-50"
+          className="p-3 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition"
         >
-          Send
+          <Send size={18} />
         </button>
       </div>
     </div>
-  );
-}
-
   );
 }
