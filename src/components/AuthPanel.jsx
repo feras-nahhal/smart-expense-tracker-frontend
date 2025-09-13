@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import axios from "axios";
+import { API_BASE } from "@/lib/config"; // ✅ import the base URL from config.js
 
 export default function AuthPanel({ onAuth }) {
   const [mode, setMode] = useState("login"); // "login" or "register"
@@ -10,16 +11,13 @@ export default function AuthPanel({ onAuth }) {
   const [budget, setBudget] = useState(""); // only for register
   const [error, setError] = useState("");
 
-  // 👉 Make sure this matches your backend address
-  const BASE_URL = "http://127.0.0.1:8000";
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
     try {
       let payload = { email, password };
-      let url = `${BASE_URL}/${mode}`;
+      let url = `${API_BASE}/${mode}`; // ✅ now dynamic from config.js
 
       if (mode === "register") {
         payload = {
@@ -116,3 +114,4 @@ export default function AuthPanel({ onAuth }) {
     </div>
   );
 }
+
