@@ -1,142 +1,88 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { WS_BASE } from "@/lib/config";
-import { Send } from "lucide-react";
 
-export default function ChatPanel() {
-  const [messages, setMessages] = useState([
-    { sender: "bot", text: "👋 Hi! Try: I spent $7 on coffee" },
-  ]);
+export default function ChatPanel({ userId }) {
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const socketRef = useRef(null);
-  const messagesEndRef = useRef(null);
-
-  // ✅ Get logged-in userId
-  const userId =
-    typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+  const [connected, setConnected] = useState(false);
+  const wsRef = useRef(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (!userId) return;
 
-  useEffect(() => {
-    if (!userId) return; // wait until user is logged in
+    const wsUrl = `${WS_BASE}/ws/chat/${userId}`;
+    const ws = new WebSocket(wsUrl);
 
-    const ws = new WebSocket(`${WS_BASE}/ws/chat/${userId}`);
-    socketRef.current = ws;
+    wsRef.current = ws;
 
-    ws.onopen = () =>
-      setMessages((m) => [...m, { sender: "sys", text: "✅ Connected" }]);
+    ws.onopen = () => {
+      console.log("✅ WebSocket connected:", wsUrl);
+      setConnected(true);
+    };
 
-    ws.onmessage = (event) => {
-      const text = event.data;
-
-      // Always log in chat
-      setMessages((m) => [...m, { sender: "bot", text }]);
-
-      // If expense changed, refresh dashboard
-      if (text.startsWith("✅ Added") || text.startsWith("📊")) {
-        window.dispatchEvent(new CustomEvent("expenses:changed"));
-      }
-
-      // If proactive alert, also broadcast globally
-      if (text.startsWith("🚨") || text.startsWith("🎯")) {
-        window.dispatchEvent(new CustomEvent("alert:new", { detail: text }));
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        setMessages((prev) => [...prev, msg]);
+      } catch (err) {
+        console.error("❌ Error parsing message:", err);
       }
     };
 
-    ws.onclose = () =>
-      setMessages((m) => [...m, { sender: "sys", text: "⚠️ Disconnected" }]);
-
-    ws.onerror = () =>
-      setMessages((m) => [
-        ...m,
-        { sender: "sys", text: "❌ WebSocket error (check backend URL/port)" },
-      ]);
+    ws.onclose = () => {
+      console.log("❌ WebSocket closed");
+      setConnected(false);
+    };
 
     return () => ws.close();
   }, [userId]);
 
   const sendMessage = () => {
-    const text = input.trim();
-    if (!text || !socketRef.current || socketRef.current.readyState !== 1)
-      return;
-    setMessages((m) => [...m, { sender: "you", text }]);
-    socketRef.current.send(text);
-    setInput("");
-  };
-
-  const onKey = (e) => e.key === "Enter" && sendMessage();
-
-  // ✅ Logout handler
-  const handleLogout = () => {
-    localStorage.removeItem("userId");
-    localStorage.removeItem("email");
-    localStorage.removeItem("monthly_budget");
-    window.location.reload(); // reload to go back to AuthPanel
+    if (wsRef.current && input.trim()) {
+      wsRef.current.send(JSON.stringify({ message: input }));
+      setMessages((prev) => [...prev, { sender: "You", message: input }]);
+      setInput("");
+    }
   };
 
   return (
-    <div className="flex flex-col w-full h-full max-w-md mx-auto rounded-2xl shadow-xl bg-white overflow-hidden">
-      {/* Header */}
-      <div className="p-4 bg-blue-600 text-white flex items-center justify-between">
-        <div>
-          <h1 className="font-bold text-lg">💬 Smart Expense Chat</h1>
-          <p className="text-sm text-blue-100">
-            Track your spending in real time
-          </p>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="ml-4 px-3 py-1 bg-red-500 hover:bg-red-600 rounded-full text-sm font-medium shadow"
-        >
-          🚪 Logout
-        </button>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-gray-50">
+    <div className="p-4 bg-white rounded-2xl shadow flex flex-col h-80">
+      <h2 className="text-lg font-semibold mb-2">💬 Chat with AI</h2>
+      <div className="flex-1 overflow-y-auto space-y-2 border p-2 rounded-lg">
         {messages.map((m, i) => (
           <div
             key={i}
-            className={`flex ${
-              m.sender === "you" ? "justify-end" : "justify-start"
+            className={`p-2 rounded ${
+              m.sender === "You"
+                ? "bg-blue-100 text-right"
+                : "bg-gray-100 text-left"
             }`}
           >
-            <div
-              className={`px-4 py-2 rounded-2xl max-w-[75%] text-sm shadow ${
-                m.sender === "you"
-                  ? "bg-blue-600 text-white rounded-br-md"
-                  : m.sender === "bot"
-                  ? "bg-white text-gray-900 border rounded-bl-md"
-                  : "bg-yellow-100 text-yellow-800 border border-yellow-300"
-              }`}
-            >
-              {m.text}
-            </div>
+            <span className="font-semibold">{m.sender}: </span>
+            {m.message}
           </div>
         ))}
-        <div ref={messagesEndRef} />
       </div>
-
-      {/* Input */}
-      <div className="p-3 bg-white border-t flex items-center gap-2">
+      <div className="flex mt-2">
         <input
-          className="flex-1 px-4 py-2 text-sm border rounded-full 
-                     focus:outline-none focus:ring-2 focus:ring-blue-400 
-                     text-black placeholder-gray-400"
-          placeholder="Type a message..."
+          className="flex-1 border rounded-l-lg px-2 py-1"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={onKey}
+          placeholder={connected ? "Type your message..." : "Connecting..."}
+          disabled={!connected}
         />
         <button
           onClick={sendMessage}
-          className="p-3 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition"
+          disabled={!connected}
+          className="bg-blue-600 text-white px-4 rounded-r-lg hover:bg-blue-700 disabled:opacity-50"
         >
-          <Send size={18} />
+          Send
         </button>
       </div>
     </div>
+  );
+}
+
   );
 }
