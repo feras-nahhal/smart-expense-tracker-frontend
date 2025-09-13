@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { uploadReceipt } from "@/lib/api";
+import axios from "axios";
+import { API_BASE } from "@/lib/config";
 
 export default function ReceiptUploader() {
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState("");
   const inputRef = useRef(null);
 
-  // Get the logged-in userId from localStorage
+  // ✅ Get logged-in userId from localStorage
   const userId =
     typeof window !== "undefined" ? localStorage.getItem("userId") : null;
 
@@ -23,20 +24,34 @@ export default function ReceiptUploader() {
       setStatus("❌ Missing file or user not logged in");
       return;
     }
+
     setStatus("⏳ Uploading...");
+
     try {
-      const { data } = await uploadReceipt(userId, file);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await axios.post(
+        `${API_BASE}/upload/receipt?user_id=${userId}`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      const data = res.data;
       setStatus(
         `✅ Parsed $${data.amount?.toFixed(2) || 0} • ${
           data.category || "Unknown"
         }`
       );
+
       // refresh dashboard + charts
       window.dispatchEvent(new CustomEvent("expenses:changed"));
       setFile(null); // reset after upload
     } catch (e) {
       console.error("Upload failed:", e);
-      setStatus("❌ Upload failed");
+      setStatus(
+        `❌ Upload failed: ${e.response?.data?.detail || e.message || "Unknown error"}`
+      );
     }
   };
 
