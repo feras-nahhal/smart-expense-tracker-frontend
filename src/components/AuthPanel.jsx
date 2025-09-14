@@ -21,7 +21,7 @@ export default function AuthPanel({ onAuth }) {
 
       if (mode === "register") {
         payload.name = name;
-        payload.budget = parseFloat(budget) || 0;
+        payload.monthly_budget = Number(budget) || 0;
       }
 
       const res = await axios.post(url, payload);
