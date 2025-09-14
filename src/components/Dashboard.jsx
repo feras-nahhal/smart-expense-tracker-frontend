@@ -3,7 +3,7 @@ import BudgetOptimizer from "./BudgetOptimizer";
 import { useEffect, useState } from "react";
 import { getTrends, getGoals, uploadCSV } from "@/lib/api";
 import axios from "axios";
-import { API_BASE } from "@/lib/config";   // ✅ use config.js
+import { API_BASE } from "@/lib/config";   
 import {
   PieChart,
   Pie,
