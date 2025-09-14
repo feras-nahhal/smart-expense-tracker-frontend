@@ -21,11 +21,11 @@ export default function AuthPanel({ onAuth }) {
 
       if (mode === "register") {
         payload.name = name;
-        payload.monthly_budget = Number(budget) || 0; // ✅ correct key
+        payload.monthly_budget = Number(budget) || 0; 
       }
 
       const res = await axios.post(url, payload, {
-        headers: { "Content-Type": "application/json" }, // ✅ ensure JSON
+        headers: { "Content-Type": "application/json" }, 
       });
 
       if (res.data?.user_id) {
