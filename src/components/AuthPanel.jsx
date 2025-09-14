@@ -21,13 +21,19 @@ export default function AuthPanel({ onAuth }) {
 
       if (mode === "register") {
         payload.name = name;
-        payload.budget = Number(budget) || 0;
+        payload.monthly_budget = Number(budget) || 0; // ✅ correct key
       }
 
-      const res = await axios.post(url, payload);
+      const res = await axios.post(url, payload, {
+        headers: { "Content-Type": "application/json" }, // ✅ ensure JSON
+      });
 
       if (res.data?.user_id) {
         localStorage.setItem("userId", res.data.user_id);
+        localStorage.setItem("email", res.data.email);
+        if (res.data.monthly_budget !== undefined) {
+          localStorage.setItem("monthly_budget", res.data.monthly_budget);
+        }
         onAuth(res.data.user_id);
       } else {
         setError("❌ Failed to authenticate user");
